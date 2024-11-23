@@ -22,6 +22,11 @@
 // ARM-developer - Accessing memory-mapped peripherals
 // https://developer.arm.com/documentation/102618/0100
 
+//#define MAX_DEVIATION 1024 // Use this to make mirror stay vertical
+#define MAX_DEVIATION 4096 // Use this to make mirror scan
+
+#define CENTER_PARK_MODE 0 // 0==Normal, 1=Keep in center
+ 
 // Low Power Mode Control - See datasheet section 10
 #define SYSTEM 0x40010000 // System Registers
 #define SYSTEM_SBYCR   ((volatile unsigned short *)(SYSTEM + 0xE00C))      // Standby Control Register
@@ -132,7 +137,7 @@ void setup()
   loop_count=0;
 
   pinMode(2, INPUT);
-  if (digitalRead(2)==HIGH) {
+  if ( (digitalRead(2)==HIGH) || CENTER_PARK_MODE ) {
     *DAC12_DADR0 = 4096/2;
     mode=MODE_POWERON;
     while(1) {}
@@ -144,14 +149,15 @@ void setup()
   }
 
 
-#define STEP_SIZE (4096/512)
+#define STEP_SIZE 8
+// (4096/512)
 // 4096/512 = 8
 
 void loop()                            // Total loop()          - takes c. 667nS per loop; or c. 750nS per loop with if()
   {
 
-  time_slower += 1;
-  if (time_slower==8) {
+  time_slower += 1;                                                                                      
+  if (time_slower==20) {
 
     if(loop_count == 0) {               // loop() and loop_count - takes c. 500nS
       *PFS_P107PFS_BY = 0x05;              // Set D7 output high    - takes c.  83nS                   // ... when test is true, adds c. 83nS to loop time to reset counter
@@ -164,13 +170,13 @@ void loop()                            // Total loop()          - takes c. 667nS
     //delayMicroseconds(1);
     };
 
-    if ((loop_count % STEP_SIZE==2) && (mode==MODE_FORWARD )){ // Line trigger -- a bit after the galvo command
+    if ((loop_count % STEP_SIZE==1) && (mode==MODE_FORWARD )){ // Line trigger -- a bit after the galvo command
       *PFS_P106PFS_BY = 0x05;              
     } else {
       *PFS_P106PFS_BY = 0x04;
     }
 
-    if(loop_count >= 4096) {               // loop() and loop_count - takes c. 500nS
+    if(loop_count >= ((STEP_SIZE*512)) ) {               // loop() and loop_count - takes c. 500nS
       loop_count = 0;                    // ... when test is true, adds c. 83nS to loop time to reset counter
     } else {
       ;              // Set D7 output low     - takes c.  83nS
@@ -179,7 +185,7 @@ void loop()                            // Total loop()          - takes c. 667nS
     if (mode==MODE_FORWARD) {
       loop_count++;
 
-      if (loop_count >= 4096) {
+      if (loop_count >= MAX_DEVIATION) {
         loop_count--;
         mode = MODE_FLYBACK;
       }
